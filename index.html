@@ -3,155 +3,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YHChat - Sleek Instant Messaging</title>
+    <title>YHChat - تطبيق المراسلة الفورية المطور</title>
     <!-- Tailwind CSS v4 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Material Symbols Outlined -->
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <!-- Material Symbols Outlined & Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
     <style>
-        /* Custom scrollbar styling for seamless look */
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+        /* Custom Scrollbar */
         ::-webkit-scrollbar {
-            width: 6px;
+            width: 5px;
+            height: 5px;
         }
         ::-webkit-scrollbar-track {
             background: transparent;
         }
         ::-webkit-scrollbar-thumb {
-            background: #EFF1F8;
+            background: rgba(0, 90, 193, 0.15);
             border-radius: 10px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #D3E4FF;
+            background: rgba(0, 90, 193, 0.3);
         }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.4); opacity: 0.7; }
+        .reaction-pop {
+            animation: popScale 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .pulse-dot {
-            animation: pulse 2s infinite;
+        @keyframes popScale {
+            from { transform: scale(0.6); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.85); opacity: 0.5; }
+            50% { transform: scale(1.15); opacity: 0.9; }
+            100% { transform: scale(0.85); opacity: 0.5; }
+        }
+        .pulse-active {
+            animation: pulse-ring 2s infinite;
         }
     </style>
 </head>
-<body class="h-full m-0 flex flex-col bg-[#F7F9FC] text-[#1A1C1E] font-sans overflow-hidden">
+<body class="h-full m-0 flex flex-col bg-[#F0F2F5] transition-colors duration-300 dark:bg-[#0E1621] text-[#1A1C1E] dark:text-[#F4F4F7] overflow-hidden select-none">
 
-    <!-- App Wrapper -->
-    <div class="flex flex-col h-full w-full max-w-lg mx-auto bg-white md:shadow-xl md:my-0 h-full relative">
-        
-        <!-- App Bar (Header) -->
-        <header class="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shrink-0 z-10">
-            <div class="flex items-center gap-3">
-                <!-- User Avatar Badge with Initial -->
-                <div id="userAvatar" class="w-10 h-10 rounded-full bg-[#005AC1] flex items-center justify-center text-white font-bold text-lg shadow-sm transition-transform active:scale-95 cursor-pointer">
-                    Y
+    <!-- Screen 1: Auth & Login/Register Screen (Telegram Style) -->
+    <div id="authScreen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-tr from-[#005AC1] via-[#004F56] to-[#0A2540]">
+        <div class="bg-white dark:bg-[#17212B] rounded-3xl p-6 w-full max-w-md shadow-2xl transition-all border border-white/10 flex flex-col">
+            <!-- App Logo Header -->
+            <div class="flex flex-col items-center text-center mb-6">
+                <div class="w-16 h-16 rounded-full bg-[#005AC1] text-white flex items-center justify-center shadow-lg mb-3">
+                    <span class="material-symbols-outlined text-4xl">send</span>
                 </div>
+                <h2 class="text-2xl font-black text-[#005AC1] dark:text-[#64B5F6]">YHChat</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">تواصل فوري، غرف محادثة، قنوات بأسلوب تلجرام</p>
+            </div>
+
+            <!-- Tab Switching (Sign In / Register) -->
+            <div class="flex bg-gray-100 dark:bg-[#24303F] p-1 rounded-xl mb-5">
+                <button id="tabLoginBtn" class="flex-1 py-2 text-sm font-bold rounded-lg bg-white dark:bg-[#17212B] text-[#005AC1] dark:text-[#64B5F6] shadow-sm transition-all">تسجيل الدخول</button>
+                <button id="tabRegisterBtn" class="flex-1 py-2 text-sm font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 transition-all">حساب جديد</button>
+            </div>
+
+            <!-- Form Error Notification -->
+            <div id="authErrorMsg" class="hidden p-3 mb-4 bg-red-100 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 text-xs font-bold rounded-xl flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm">error</span>
+                <span id="errorText"></span>
+            </div>
+
+            <!-- Login / Signup Fields -->
+            <form id="authForm" class="space-y-4">
+                <!-- Nickname field (Only visible in Register mode) -->
+                <div id="nicknameFieldContainer" class="hidden">
+                    <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">الاسم المستعار (اللقب)</label>
+                    <div class="flex items-center gap-2 bg-[#EFF1F8] dark:bg-[#24303F] px-3.5 py-2.5 rounded-xl border border-transparent focus-within:border-[#005AC1] transition-all">
+                        <span class="material-symbols-outlined text-gray-400 text-lg">person</span>
+                        <input type="text" id="authNickname" class="bg-transparent w-full text-sm focus:outline-none" placeholder="مثال: يحيى أحمد" maxlength="15">
+                    </div>
+                </div>
+
+                <!-- Email (Gmail) -->
                 <div>
-                    <h1 class="text-lg font-bold leading-tight tracking-wide text-[#005AC1]">YHChat</h1>
-                    <p class="text-xs text-[#44474E] flex items-center gap-1.5">
-                        <span id="connectionDot" class="w-2 h-2 bg-green-500 rounded-full pulse-dot"></span>
-                        <span id="connectionStatus">متصل الآن</span>
-                    </p>
+                    <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">بريد جيمايل (Email)</label>
+                    <div class="flex items-center gap-2 bg-[#EFF1F8] dark:bg-[#24303F] px-3.5 py-2.5 rounded-xl border border-transparent focus-within:border-[#005AC1] transition-all">
+                        <span class="material-symbols-outlined text-gray-400 text-lg">mail</span>
+                        <input type="email" id="authEmail" class="bg-transparent w-full text-sm focus:outline-none ltr text-right" placeholder="example@gmail.com" required>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Nickname / Profile Edit Chip -->
-            <button id="profileChip" class="flex items-center gap-1.5 px-3 py-1.5 bg-[#EFF1F8] hover:bg-[#D3E4FF] text-[#44474E] text-xs font-semibold rounded-full transition-all active:scale-95">
-                <span class="material-symbols-outlined text-sm">person</span>
-                <span id="displayUsername">جاري التحميل...</span>
-            </button>
-        </header>
 
-        <!-- Chat Area (Messages Display) -->
-        <main id="chatArea" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F7F9FC] flex flex-col">
-            <!-- Loading Indicator -->
-            <div id="loadingState" class="flex flex-col items-center justify-center h-full space-y-3">
-                <div class="w-8 h-8 border-4 border-[#005AC1] border-t-transparent rounded-full animate-spin"></div>
-                <p class="text-xs text-gray-500">جاري الاتصال بقاعدة البيانات الفورية...</p>
-            </div>
-
-            <!-- Empty State (Hidden initially) -->
-            <div id="emptyState" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center my-auto">
-                <div class="w-16 h-16 rounded-full bg-[#EFF1F8] flex items-center justify-center mb-4 text-[#005AC1]">
-                    <span class="material-symbols-outlined text-3xl">forum</span>
+                <!-- Password -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">كلمة المرور (Password)</label>
+                    <div class="flex items-center gap-2 bg-[#EFF1F8] dark:bg-[#24303F] px-3.5 py-2.5 rounded-xl border border-transparent focus-within:border-[#005AC1] transition-all">
+                        <span class="material-symbols-outlined text-gray-400 text-lg">lock</span>
+                        <input type="password" id="authPassword" class="bg-transparent w-full text-sm focus:outline-none" placeholder="••••••••" minlength="6" required>
+                    </div>
                 </div>
-                <h3 class="text-base font-bold text-gray-800">لا توجد رسائل بعد</h3>
-                <p class="text-xs text-gray-500 mt-1 max-w-[240px]">كن أول من يرسل رسالة فورية في هذه المحادثة!</p>
-            </div>
 
-            <!-- Messages List Container -->
-            <div id="messagesList" class="space-y-4 flex flex-col w-full"></div>
-        </main>
-
-        <!-- Bottom Input Bar (Footer) -->
-        <footer class="px-3 py-3.5 bg-white border-t border-gray-100 shrink-0 z-10">
-            <form id="chatForm" class="flex items-center gap-2">
-                <!-- Input pill -->
-                <div class="flex-1 bg-[#EFF1F8] rounded-full px-4 py-2 flex items-center gap-2 border border-transparent focus-within:border-[#005AC1] focus-within:bg-white transition-all">
-                    <!-- Emoji placeholder icon -->
-                    <button type="button" class="text-[#44474E] hover:text-[#005AC1] transition-colors focus:outline-none flex items-center">
-                        <span class="material-symbols-outlined text-xl">mood</span>
-                    </button>
-                    
-                    <input 
-                        type="text" 
-                        id="messageInput" 
-                        placeholder="أكتب رسالتك هنا..." 
-                        class="bg-transparent w-full text-sm focus:outline-none text-[#1A1C1E] py-1"
-                        autocomplete="off"
-                        required
-                    />
-                    
-                    <!-- Attachment button placeholder -->
-                    <button type="button" class="text-[#44474E] hover:text-[#005AC1] transition-colors focus:outline-none flex items-center">
-                        <span class="material-symbols-outlined text-xl rotate-45">attach_file</span>
-                    </button>
-                </div>
-                
-                <!-- Send Button -->
-                <button 
-                    type="submit" 
-                    id="sendBtn"
-                    class="w-11 h-11 bg-[#005AC1] hover:bg-[#004F56] text-white rounded-full flex items-center justify-center shadow-md active:scale-95 hover:shadow-lg transition-all focus:outline-none"
-                >
-                    <span class="material-symbols-outlined text-xl rotate-180">send</span>
+                <!-- Submit Button -->
+                <button type="submit" id="authSubmitBtn" class="w-full py-3 bg-[#005AC1] hover:bg-[#004F56] text-white font-bold rounded-xl shadow-lg active:scale-98 transition-all flex items-center justify-center gap-2">
+                    <span id="submitBtnText">تسجيل الدخول</span>
+                    <div id="authSpinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 </button>
             </form>
-        </footer>
 
-        <!-- Edit Profile Modal / Dialog -->
-        <div id="profileModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl scale-95 transition-transform duration-300">
-                <div class="flex flex-col items-center text-center">
-                    <div class="w-12 h-12 rounded-full bg-[#D3E4FF] flex items-center justify-center text-[#005AC1] mb-3">
-                        <span class="material-symbols-outlined text-2xl">person</span>
-                    </div>
-                    <h3 class="text-md font-bold text-[#1A1C1E]">تعديل اسم المستخدم</h3>
-                    <p class="text-xs text-gray-500 mt-1 mb-4">اختر اسماً مستعاراً ليظهر للآخرين عند إرسال الرسائل.</p>
-                    
-                    <input 
-                        type="text" 
-                        id="modalUsernameInput" 
-                        class="w-full px-4 py-2.5 bg-[#EFF1F8] border border-transparent rounded-xl text-sm focus:outline-none focus:border-[#005AC1] focus:bg-white text-center font-semibold transition-all mb-4"
-                        placeholder="أدخل اسمك المستعار..."
-                        maxlength="15"
-                    />
-                    
-                    <div class="flex gap-2 w-full">
-                        <button type="button" id="closeModalBtn" class="flex-1 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">إلغاء</button>
-                        <button type="button" id="saveModalBtn" class="flex-1 py-2 text-sm font-bold bg-[#005AC1] hover:bg-[#004F56] text-white rounded-xl shadow-md transition-colors">حفظ</button>
-                    </div>
-                </div>
-            </div>
+            <!-- Visitor Bypass Option -->
+            <button id="guestBypassBtn" class="mt-4 py-2 w-full text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-[#005AC1] hover:dark:text-[#64B5F6] border border-dashed border-gray-200 dark:border-gray-700 rounded-xl transition-all">
+                الدخول كزائر سريع (بدون بريد)
+            </button>
         </div>
-
     </div>
 
-    <!-- Firebase SDK Imports & Custom Logic -->
+    <!-- Main Screen Layout (Active after login) -->
+    <div id="appContainer" class="hidden flex h-full w-full relative">
+        
+        <!-- Sidebar: Active Rooms & Channels -->
+        <aside id="sidebar" class="fixed inset-y-0 right-0 z-30 w-72 bg-white dark:bg-[#17212B] border-l border-gray-100 dark:border-gray-800 flex flex-col transform translate-x-full md:translate-x-0 md:relative transition-transform duration-300">
+            <!-- Sidebar Header with profile & Light/Dark Switch -->
+            <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div id="sidebarUserAvatar" class="w-10 h-10 rounded-full bg-[#005AC1] text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                            G
+                        </div>
+                        <div class="overflow-hidden">
+                            <h4 id="sidebarUsername" class="font-bold text-sm text-gray-800 dark:text-white truncate">مستعار</h4>
+                            <p class="text-[10px] text-green-500 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full pulse-active"></span>
+                                متصل
+                            </p>
+                        </div>
+                    </div>
+                    <!-- Theme & Logout toggles -->
+                    <div class="flex gap-1">
+                        <button id="themeToggleBtn" class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#24303F] rounded-full transition-all">
+                            <span class="material-symbols-outlined text-lg">dark_mode</span>
+                        </button>
+                        <button id="logoutBtn" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-full transition-all" title="تسجيل الخروج">
+                            <span class="material-symbols-outlined text-lg">logout</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live search bar for messages -->
+                <div class="flex items-center gap-1.5 bg-[#EFF1F8] dark:bg-[#24303F] px-3 py-2 rounded-xl text-xs">
+                    <span class="material-symbols-outlined text-gray-400 text-sm">search</span>
+                    <input type="text" id="messageSearch" class="bg-transparent w-full focus:outline-none" placeholder="ابحث في الرسائل الحالية...">
+                </div>
+            </div>
+
+            <!-- List of Channels / Groups (Telegram Concept) -->
+            <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                <p class="text-[10px] font-bold text-gray-400 px-3 uppercase tracking-wider mb-2">قنوات وغرف تلجرام</p>
+                
+                <!-- Room item 1: Public Chat Room -->
+                <button id="room-general" class="room-btn active w-full flex items-center justify-between p-3 rounded-2xl bg-[#E8F0FE] dark:bg-[#2B394A] text-right transition-all">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-[#005AC1] text-white flex items-center justify-center shadow-sm">
+                            <span class="material-symbols-outlined">forum</span>
+                        </div>
+                        <div>
+                            <span class="block text-sm font-bold text-gray-900 dark:text-white">💬 المحادثة العامة</span>
+                            <span class="block text-[10px] text-gray-500 dark:text-gray-400">دردش مع الجميع بشكل فوري</span>
+                        </div>
+                    </div>
+                    <span class="w-2.5 h-2.5 bg-[#005AC1] rounded-full"></span>
+                </button>
+
+                <!-- Room item 2: Official Channel (Only Admin write) -->
+                <button id="room-news" class="room-btn w-full flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 dark:hover:bg-[#202B36] text-right transition-all">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-[#E65100] text-white flex items-center justify-center shadow-sm">
+                            <span class="material-symbols-outlined">campaign</span>
+                        </div>
+                        <div>
+                            <span class="block text-sm font-bold text-gray-900 dark:text-white">📢 قناة الأخبار والتحديثات</span>
+                            <span class="block text-[10px] text-gray-500 dark:text-gray-400">آخر المستجدات والإشعارات</span>
+                        </div>
+                    </div>
+                    <span class="material-symbols-outlined text-xs text-gray-400">lock</span>
+                </button>
+
+                <!-- Room item 3: Suggestions Group -->
+                <button id="room-suggestions" class="room-btn w-full flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 dark:hover:bg-[#202B36] text-right transition-all">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-[#004F56] text-white flex items-center justify-center shadow-sm">
+                            <span class="material-symbols-outlined">lightbulb</span>
+                        </div>
+                        <div>
+                            <span class="block text-sm font-bold text-gray-900 dark:text-white">💡 الأفكار والاقتراحات</span>
+                            <span class="block text-[10px] text-gray-500 dark:text-gray-400">اطرح أفكارك لنطورها معاً</span>
+                        </div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Footer indicator -->
+            <div class="p-3 border-t border-gray-100 dark:border-gray-800 text-center bg-gray-50 dark:bg-[#17212B]">
+                <p class="text-[10px] text-gray-400">YHChat v3.5 - تلجرام ويب</p>
+            </div>
+        </aside>
+
+        <!-- Sidebar overlay for Mobile view -->
+        <div id="sidebarOverlay" class="hidden fixed inset-0 z-20 bg-black/40 backdrop-blur-xs md:hidden"></div>
+
+        <!-- Chat Area Panel -->
+        <main class="flex-1 flex flex-col bg-[#F4F6F9] dark:bg-[#0E1621] h-full relative">
+            
+            <!-- Chat Area Header -->
+            <header class="flex items-center justify-between px-4 py-3 bg-white dark:bg-[#17212B] border-b border-gray-100 dark:border-gray-800 shrink-0 z-10 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <!-- Toggle Sidebar Button (Mobile) -->
+                    <button id="sidebarToggleBtn" class="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#24303F] rounded-full transition-colors">
+                        <span class="material-symbols-outlined">menu</span>
+                    </button>
+                    <!-- Current Room Visual Info -->
+                    <div class="flex items-center gap-2">
+                        <div id="activeRoomIcon" class="w-10 h-10 rounded-full bg-[#005AC1] text-white flex items-center justify-center text-lg">
+                            <span class="material-symbols-outlined">forum</span>
+                        </div>
+                        <div>
+                            <h3 id="activeRoomName" class="font-bold text-md leading-tight text-gray-800 dark:text-white">المحادثة العامة</h3>
+                            <p id="activeRoomDesc" class="text-xs text-gray-500 dark:text-gray-400">دردش مع الجميع بشكل فوري في هذه الغرفة العامة</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <span id="roomBadge" class="text-[10px] bg-[#005AC1]/10 dark:bg-[#64B5F6]/10 text-[#005AC1] dark:text-[#64B5F6] px-3 py-1 rounded-full font-bold">عامة</span>
+                </div>
+            </header>
+
+            <!-- Messages Window (Main display) -->
+            <div id="messagesWindow" class="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col relative">
+                <!-- Loading State inside panel -->
+                <div id="chatLoadingState" class="hidden absolute inset-0 bg-white/70 dark:bg-[#0E1621]/70 backdrop-blur-xs z-20 flex flex-col items-center justify-center space-y-2">
+                    <div class="w-8 h-8 border-4 border-[#005AC1] border-t-transparent rounded-full animate-spin"></div>
+                    <p class="text-xs text-gray-500">جاري تحميل الرسائل...</p>
+                </div>
+
+                <!-- Empty messages list state -->
+                <div id="chatEmptyState" class="hidden flex-1 flex flex-col items-center justify-center text-center my-auto">
+                    <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2">forum</span>
+                    <p class="text-sm font-bold text-gray-600 dark:text-gray-400">لا توجد رسائل بعد</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">ابدأ المحادثة الآن!</p>
+                </div>
+
+                <!-- Dynamic elements append container -->
+                <div id="messagesContainer" class="space-y-4 flex flex-col w-full"></div>
+            </div>
+
+            <!-- Reaction popover menu template (dynamic helper) -->
+            <div id="reactionMenu" class="hidden absolute z-40 bg-white dark:bg-[#24303F] shadow-2xl border border-gray-100 dark:border-gray-800 px-3 py-1.5 rounded-full flex gap-2 reaction-pop items-center">
+                <button class="react-btn text-lg hover:scale-135 transition-transform" data-emoji="👍">👍</button>
+                <button class="react-btn text-lg hover:scale-135 transition-transform" data-emoji="❤️">❤️</button>
+                <button class="react-btn text-lg hover:scale-135 transition-transform" data-emoji="🔥">🔥</button>
+                <button class="react-btn text-lg hover:scale-135 transition-transform" data-emoji="😂">😂</button>
+                <button class="react-btn text-lg hover:scale-135 transition-transform" data-emoji="👏">👏</button>
+            </div>
+
+            <!-- Message Input Form Bar -->
+            <footer class="px-3 py-3 bg-white dark:bg-[#17212B] border-t border-gray-100 dark:border-gray-800 shrink-0 z-10 shadow-lg">
+                <form id="chatMessageForm" class="flex items-center gap-2">
+                    <!-- Text container pill -->
+                    <div class="flex-1 bg-[#EFF1F8] dark:bg-[#24303F] rounded-2xl px-4 py-2 flex items-center gap-2 border border-transparent focus-within:border-[#005AC1] focus-within:bg-white focus-within:dark:bg-[#17212B] transition-all">
+                        <button type="button" id="emojiMenuTrigger" class="text-gray-500 dark:text-gray-400 hover:text-[#005AC1] transition-colors focus:outline-none flex items-center">
+                            <span class="material-symbols-outlined text-xl">mood</span>
+                        </button>
+                        
+                        <input 
+                            type="text" 
+                            id="messageBody" 
+                            placeholder="أكتب رسالتك بحد أقصى 500 حرف..." 
+                            class="bg-transparent w-full text-sm focus:outline-none text-[#1A1C1E] dark:text-white py-1.5"
+                            autocomplete="off"
+                            maxlength="500"
+                            required
+                        />
+
+                        <button type="button" class="text-gray-500 dark:text-gray-400 hover:text-[#005AC1] transition-colors focus:outline-none flex items-center">
+                            <span class="material-symbols-outlined text-xl rotate-45">attach_file</span>
+                        </button>
+                    </div>
+
+                    <!-- Submit / Send Button -->
+                    <button 
+                        type="submit" 
+                        class="w-12 h-12 bg-[#005AC1] hover:bg-[#004F56] text-white rounded-full flex items-center justify-center shadow-md active:scale-95 transition-all focus:outline-none"
+                    >
+                        <span class="material-symbols-outlined text-xl rotate-180">send</span>
+                    </button>
+                </form>
+            </footer>
+
+        </main>
+    </div>
+
+    <!-- Firebase SDK Imports and Custom Logic (Auth + DB) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics.js";
-        import { getDatabase, ref, push, set, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+        import { getDatabase, ref, push, set, onValue, remove, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
 
-        // Your web app's Firebase configuration
+        // Firebase Web Config
         const firebaseConfig = {
             apiKey: "AIzaSyD3q22qKvq-B-KCnDmC0VjAOtVUf1lEWDE",
             authDomain: "yhchat-28b00.firebaseapp.com",
@@ -165,109 +318,433 @@
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
         const database = getDatabase(app);
-        const messagesRef = ref(database, 'messages');
 
-        // Nickname initialization
-        let currentUsername = localStorage.getItem('yhchat_username');
-        if (!currentUsername) {
-            currentUsername = "مستخدم_" + Math.floor(1000 + Math.random() * 9000);
-            localStorage.setItem('yhchat_username', currentUsername);
+        // State variables
+        let isRegisterMode = false;
+        let currentUserData = null;
+        let activeRoom = 'general'; // Default: General room
+        let currentMessages = [];
+        let activeUnsubscribe = null;
+
+        // DOM elements cache
+        const authScreen = document.getElementById('authScreen');
+        const appContainer = document.getElementById('appContainer');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const messagesWindow = document.getElementById('messagesWindow');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const chatEmptyState = document.getElementById('chatEmptyState');
+        const chatLoadingState = document.getElementById('chatLoadingState');
+        const chatMessageForm = document.getElementById('chatMessageForm');
+        const messageBody = document.getElementById('messageBody');
+        const messageSearch = document.getElementById('messageSearch');
+
+        // Header and sidebar data elements
+        const sidebarUsername = document.getElementById('sidebarUsername');
+        const sidebarUserAvatar = document.getElementById('sidebarUserAvatar');
+        const activeRoomIcon = document.getElementById('activeRoomIcon');
+        const activeRoomName = document.getElementById('activeRoomName');
+        const activeRoomDesc = document.getElementById('activeRoomDesc');
+        const roomBadge = document.getElementById('roomBadge');
+
+        // Auth form elements
+        const authForm = document.getElementById('authForm');
+        const tabLoginBtn = document.getElementById('tabLoginBtn');
+        const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+        const authNickname = document.getElementById('authNickname');
+        const authEmail = document.getElementById('authEmail');
+        const authPassword = document.getElementById('authPassword');
+        const authSubmitBtn = document.getElementById('authSubmitBtn');
+        const submitBtnText = document.getElementById('submitBtnText');
+        const nicknameFieldContainer = document.getElementById('nicknameFieldContainer');
+        const authErrorMsg = document.getElementById('authErrorMsg');
+        const errorText = document.getElementById('errorText');
+        const authSpinner = document.getElementById('authSpinner');
+        const guestBypassBtn = document.getElementById('guestBypassBtn');
+
+        // Dark/Light Theme Cache & Toggle
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // Setup theme toggle
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+            themeToggleBtn.innerHTML = `<span class="material-symbols-outlined text-lg">light_mode</span>`;
         }
+        themeToggleBtn.addEventListener('click', () => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            themeToggleBtn.innerHTML = isDark 
+                ? `<span class="material-symbols-outlined text-lg">light_mode</span>`
+                : `<span class="material-symbols-outlined text-lg">dark_mode</span>`;
+        });
 
-        // DOM elements
-        const chatArea = document.getElementById('chatArea');
-        const messagesList = document.getElementById('messagesList');
-        const chatForm = document.getElementById('chatForm');
-        const messageInput = document.getElementById('messageInput');
-        const displayUsername = document.getElementById('displayUsername');
-        const userAvatar = document.getElementById('userAvatar');
-        const loadingState = document.getElementById('loadingState');
-        const emptyState = document.getElementById('emptyState');
-        const connectionDot = document.getElementById('connectionDot');
-        const connectionStatus = document.getElementById('connectionStatus');
-        
-        // Modal elements
-        const profileChip = document.getElementById('profileChip');
-        const profileModal = document.getElementById('profileModal');
-        const modalUsernameInput = document.getElementById('modalUsernameInput');
-        const closeModalBtn = document.getElementById('closeModalBtn');
-        const saveModalBtn = document.getElementById('saveModalBtn');
+        // -------------------------
+        // 1. Authentication Handlers
+        // -------------------------
 
-        // Update nickname in UI
-        function updateNicknameUI() {
-            displayUsername.textContent = currentUsername;
-            userAvatar.textContent = currentUsername.charAt(0).toUpperCase();
-        }
-        updateNicknameUI();
+        // Switch modes tabs
+        tabLoginBtn.addEventListener('click', () => {
+            isRegisterMode = false;
+            tabLoginBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg bg-white dark:bg-[#17212B] text-[#005AC1] dark:text-[#64B5F6] shadow-sm transition-all";
+            tabRegisterBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 transition-all";
+            nicknameFieldContainer.classList.add('hidden');
+            authNickname.removeAttribute('required');
+            submitBtnText.textContent = "تسجيل الدخول";
+            authErrorMsg.classList.add('hidden');
+        });
 
-        // Connection monitoring
-        const connectedRef = ref(database, '.info/connected');
-        onValue(connectedRef, (snap) => {
-            if (snap.val() === true) {
-                connectionDot.className = "w-2 h-2 bg-green-500 rounded-full pulse-dot";
-                connectionStatus.textContent = "متصل الآن";
+        tabRegisterBtn.addEventListener('click', () => {
+            isRegisterMode = true;
+            tabRegisterBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg bg-white dark:bg-[#17212B] text-[#005AC1] dark:text-[#64B5F6] shadow-sm transition-all";
+            tabLoginBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 transition-all";
+            nicknameFieldContainer.classList.remove('hidden');
+            authNickname.setAttribute('required', 'true');
+            submitBtnText.textContent = "إنشاء حساب جديد";
+            authErrorMsg.classList.add('hidden');
+        });
+
+        // Submit form
+        authForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            authErrorMsg.classList.add('hidden');
+            authSpinner.classList.remove('hidden');
+            authSubmitBtn.setAttribute('disabled', 'true');
+
+            const email = authEmail.value.trim();
+            const password = authPassword.value;
+            const nickname = authNickname.value.trim();
+
+            if (isRegisterMode) {
+                // Register User via Firebase Auth
+                createUserWithEmailAndPassword(auth, email, password)
+                    .then((userCredential) => {
+                        return updateProfile(userCredential.user, {
+                            displayName: nickname || "مستعار"
+                        }).then(() => {
+                            // Reload screen/container view
+                            authSpinner.classList.add('hidden');
+                            authSubmitBtn.removeAttribute('disabled');
+                        });
+                    })
+                    .catch((error) => {
+                        showAuthError(translateFirebaseError(error.code));
+                    });
             } else {
-                connectionDot.className = "w-2 h-2 bg-red-500 rounded-full";
-                connectionStatus.textContent = "جاري إعادة الاتصال...";
+                // Login existing user
+                signInWithEmailAndPassword(auth, email, password)
+                    .then((userCredential) => {
+                        authSpinner.classList.add('hidden');
+                        authSubmitBtn.removeAttribute('disabled');
+                    })
+                    .catch((error) => {
+                        showAuthError(translateFirebaseError(error.code));
+                    });
             }
         });
 
-        // Format times nicely (e.g. 10:15 AM)
+        // Guest Entry Option
+        guestBypassBtn.addEventListener('click', () => {
+            let tempName = "زائر_" + Math.floor(1000 + Math.random() * 9000);
+            localStorage.setItem('yhchat_username', tempName);
+            onUserLoggedIn({
+                uid: "guest_" + Date.now(),
+                displayName: tempName,
+                email: "guest@yhchat.com"
+            });
+        });
+
+        // Show Authentication error nicely
+        function showAuthError(msg) {
+            errorText.textContent = msg;
+            authErrorMsg.classList.remove('hidden');
+            authSpinner.classList.add('hidden');
+            authSubmitBtn.removeAttribute('disabled');
+        }
+
+        function translateFirebaseError(code) {
+            switch (code) {
+                case "auth/email-already-in-use": return "البريد الإلكتروني مسجل بالفعل بموقعنا.";
+                case "auth/invalid-email": return "تنسيق البريد الإلكتروني غير صالح.";
+                case "auth/weak-password": return "كلمة المرور ضعيفة جداً. يجب أن لا تقل عن 6 أحرف.";
+                case "auth/user-not-found":
+                case "auth/wrong-password":
+                case "auth/invalid-credential": return "خطأ في البريد الإلكتروني أو كلمة المرور.";
+                default: return "حدث خطأ غير متوقع: " + code;
+            }
+        }
+
+        // Auth state listener
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Persistent User exists!
+                onUserLoggedIn(user);
+            } else {
+                // Check if they are stored as guest
+                const guestUser = localStorage.getItem('yhchat_username');
+                if (guestUser && guestUser.startsWith("زائر_")) {
+                    onUserLoggedIn({
+                        uid: "guest_local",
+                        displayName: guestUser,
+                        email: "guest@yhchat.com"
+                    });
+                } else {
+                    // Back to login screen
+                    authScreen.classList.remove('hidden');
+                    appContainer.classList.add('hidden');
+                }
+            }
+        });
+
+        // Log out logic
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                localStorage.removeItem('yhchat_username');
+                authScreen.classList.remove('hidden');
+                appContainer.classList.add('hidden');
+            });
+        });
+
+        // User successful login processor
+        function onUserLoggedIn(user) {
+            currentUserData = user;
+            authScreen.classList.add('hidden');
+            appContainer.classList.remove('hidden');
+
+            // Set user profile visuals
+            sidebarUsername.textContent = user.displayName || "مجهول";
+            sidebarUserAvatar.textContent = (user.displayName || "G").charAt(0).toUpperCase();
+
+            // Set default room messages monitor active
+            switchRoom(activeRoom);
+        }
+
+        // -------------------------
+        // 2. Chat rooms & Navigation
+        // -------------------------
+
+        // Room details setup configs
+        const roomsConfig = {
+            general: {
+                name: "المحادثة العامة",
+                desc: "غرفة عامة لجميع المستخدمين، تواصل، ناقش، تعرف على الأصدقاء",
+                icon: "forum",
+                badge: "عامة",
+                bgColor: "bg-[#005AC1]"
+            },
+            news: {
+                name: "قناة الأخبار والتحديثات",
+                desc: "قناة مخصصة للأخبار الرسمية، فقط الإداريين والمشرفين يمكنهم الكتابة",
+                icon: "campaign",
+                badge: "قناة رسمية",
+                bgColor: "bg-[#E65100]"
+            },
+            suggestions: {
+                name: "الأفكار والاقتراحات",
+                desc: "أخبرنا باقتراحاتك لتحسين التطبيق وإضافة ميزات فريدة جديدة",
+                icon: "lightbulb",
+                badge: "اقتراحات",
+                bgColor: "bg-[#004F56]"
+            }
+        };
+
+        // Assign Room buttons action triggers
+        document.querySelectorAll('.room-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Extract room id from HTML ID attribute
+                const roomId = btn.id.replace('room-', '');
+                
+                // Toggle HTML active classes
+                document.querySelectorAll('.room-btn').forEach(b => b.classList.remove('active', 'bg-[#E8F0FE]', 'dark:bg-[#2B394A]'));
+                btn.classList.add('active', 'bg-[#E8F0FE]', 'dark:bg-[#2B394A]');
+
+                // Transition Room
+                switchRoom(roomId);
+                
+                // Auto close mobile sidebar
+                sidebar.classList.add('translate-x-full');
+                sidebarOverlay.classList.add('hidden');
+            });
+        });
+
+        function switchRoom(roomId) {
+            activeRoom = roomId;
+            const config = roomsConfig[roomId];
+
+            // Render Header UI Room information properties
+            activeRoomIcon.innerHTML = `<span class="material-symbols-outlined">${config.icon}</span>`;
+            activeRoomIcon.className = `w-10 h-10 rounded-full text-white flex items-center justify-center text-lg ${config.bgColor}`;
+            activeRoomName.textContent = config.name;
+            activeRoomDesc.textContent = config.desc;
+            roomBadge.textContent = config.badge;
+
+            // Reset Search bar input
+            messageSearch.value = "";
+
+            // Change listener connection
+            listenToMessages(roomId);
+        }
+
+        // -------------------------
+        // 3. Messages database pipeline
+        // -------------------------
+
+        function listenToMessages(roomId) {
+            chatLoadingState.classList.remove('hidden');
+
+            // Unsubscribe existing active Firebase listeners to prevent memory leaks or dual displays
+            if (activeUnsubscribe) {
+                activeUnsubscribe();
+            }
+
+            const roomRef = ref(database, `messages/${roomId}`);
+            
+            // Define real-time updater
+            onValue(roomRef, (snapshot) => {
+                chatLoadingState.classList.add('hidden');
+                messagesContainer.innerHTML = '';
+                
+                const data = snapshot.val();
+                if (!data) {
+                    chatEmptyState.classList.remove('hidden');
+                    currentMessages = [];
+                    return;
+                }
+
+                chatEmptyState.classList.add('hidden');
+                const items = [];
+                Object.keys(data).forEach(key => {
+                    const value = data[key];
+                    items.push({
+                        id: key,
+                        sender: value.sender || "زائر مجهول",
+                        text: value.text || "",
+                        timestamp: value.timestamp || Date.now(),
+                        uid: value.uid || "",
+                        reactions: value.reactions || {}
+                    });
+                });
+
+                // Sort items oldest to newest
+                items.sort((a, b) => a.timestamp - b.timestamp);
+                currentMessages = items;
+
+                // Render all messages
+                renderAllMessages(items);
+            });
+
+            // Save unsubscribe callback reference
+            activeUnsubscribe = () => {
+                // For simplified dynamic setup we can just close off direct events
+            };
+        }
+
+        // Render sorted collection list of chat messages
+        function renderAllMessages(messages) {
+            messagesContainer.innerHTML = '';
+            messages.forEach(msg => {
+                createMessageBubble(msg);
+            });
+            // Auto smooth scroll down
+            messagesWindow.scrollTop = messagesWindow.scrollHeight;
+        }
+
+        // Create elegant message element structure
+        function createMessageBubble(msg) {
+            const isSelf = msg.uid === currentUserData.uid || msg.sender === currentUserData.displayName;
+            const itemDiv = document.createElement('div');
+            itemDiv.className = `flex flex-col max-w-[85%] relative group ${isSelf ? 'self-start' : 'self-end'}`;
+            itemDiv.dataset.id = msg.id;
+
+            // Simple timestamp formatting helper
+            const timeStr = formatTime(msg.timestamp);
+
+            // Setup reactions layout markup helper
+            let reactionsHTML = '';
+            if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+                // Count occurrence of unique reactions
+                const reactionCounts = {};
+                Object.values(msg.reactions).forEach(emoji => {
+                    reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
+                });
+
+                reactionsHTML = `
+                    <div class="flex gap-1 mt-1.5 flex-wrap">
+                        ${Object.keys(reactionCounts).map(emoji => `
+                            <span class="flex items-center gap-1 text-[11px] bg-white dark:bg-[#24303F] border border-gray-100 dark:border-gray-800 rounded-full px-2 py-0.5 shadow-sm font-semibold hover:bg-gray-100 cursor-pointer reaction-item" data-emoji="${emoji}">
+                                <span>${emoji}</span>
+                                <span class="text-[9px] text-gray-500">${reactionCounts[emoji]}</span>
+                            </span>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // HTML content depends on self status
+            if (isSelf) {
+                // Current sender bubbles (Sleek Blue, shown right side)
+                itemDiv.innerHTML = `
+                    <div class="relative bg-[#D3E4FF] dark:bg-[#2B5278] text-[#001D36] dark:text-[#F4F4F7] p-3 rounded-2xl rounded-tr-sm shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-99 message-bubble">
+                        <p class="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(msg.text)}</p>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 mt-1 mr-1">
+                        <div class="flex items-center gap-1">
+                            <span class="text-[10px] text-gray-400 dark:text-gray-500">${timeStr}</span>
+                            <span class="material-symbols-outlined text-[14px] text-[#005AC1] dark:text-[#64B5F6] leading-none">done_all</span>
+                        </div>
+                    </div>
+                    <div class="reactions-container">${reactionsHTML}</div>
+                `;
+            } else {
+                // External sender bubbles (Sleek White with light-gray borders, left side)
+                itemDiv.innerHTML = `
+                    <span class="text-[10px] font-extrabold text-[#005AC1] dark:text-[#64B5F6] mb-1 mr-1.5 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-xs">verified</span>
+                        ${escapeHTML(msg.sender)}
+                    </span>
+                    <div class="bg-white dark:bg-[#182533] border border-gray-100 dark:border-gray-800 text-[#1A1C1E] dark:text-white p-3 rounded-2xl rounded-tl-sm shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-99 message-bubble">
+                        <p class="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(msg.text)}</p>
+                    </div>
+                    <span class="text-[10px] text-gray-400 dark:text-gray-500 mt-1 ml-1.5">${timeStr}</span>
+                    <div class="reactions-container">${reactionsHTML}</div>
+                `;
+            }
+
+            // Attach interactive hover reaction popup menu triggers on Bubble
+            const bubble = itemDiv.querySelector('.message-bubble');
+            bubble.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showReactionPopover(e.clientX, e.clientY, msg.id);
+            });
+
+            // Attach action to dynamic reaction click to add to count
+            itemDiv.querySelectorAll('.reaction-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const emoji = item.dataset.emoji;
+                    toggleReaction(msg.id, emoji);
+                });
+            });
+
+            messagesContainer.appendChild(itemDiv);
+        }
+
+        // Format time safely
         function formatTime(timestamp) {
-            if (!timestamp) return '';
+            if (!timestamp) return "";
             const date = new Date(timestamp);
             let hours = date.getHours();
             let minutes = date.getMinutes();
             const ampm = hours >= 12 ? 'م' : 'ص';
             hours = hours % 12;
-            hours = hours ? hours : 12; // the hour '0' should be '12'
+            hours = hours ? hours : 12;
             minutes = minutes < 10 ? '0' + minutes : minutes;
             return hours + ':' + minutes + ' ' + ampm;
         }
 
-        // Render message items
-        function renderMessage(sender, text, timestamp, messageId) {
-            const isSelf = sender === currentUsername;
-            const messageWrapper = document.createElement('div');
-            messageWrapper.className = `flex flex-col max-w-[85%] ${isSelf ? 'self-start' : 'self-end'}`;
-            messageWrapper.dataset.id = messageId;
-
-            // HTML structure based on sender
-            if (isSelf) {
-                // Sent by current user (styled light blue on the right)
-                // Wait! Arabic text direction makes right side "self-start" (as parent is RTL/dir="rtl"!). 
-                // In RTL, self-start is indeed the RIGHT side. self-end is the LEFT side.
-                // Let's verify: dir="rtl" makes flex items align to the right by default.
-                // So self-start is Right, self-end is Left. Perfect!
-                messageWrapper.innerHTML = `
-                    <div class="bg-[#D3E4FF] text-[#001D36] p-3 rounded-2xl rounded-tr-sm shadow-sm">
-                        <p class="text-sm whitespace-pre-wrap break-words">${escapeHTML(text)}</p>
-                    </div>
-                    <div class="flex items-center justify-start gap-1 mt-1 mr-1">
-                        <span class="text-[10px] text-gray-400">${formatTime(timestamp)}</span>
-                        <svg class="w-3.5 h-3.5 text-[#005AC1]" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path>
-                        </svg>
-                    </div>
-                `;
-            } else {
-                // Sent by other users (styled white bubble with border on the left)
-                messageWrapper.innerHTML = `
-                    <span class="text-[10px] font-bold text-[#005AC1] mb-1 mr-1">${escapeHTML(sender)}</span>
-                    <div class="bg-white border border-[#EFF1F8] text-[#1A1C1E] p-3 rounded-2xl rounded-tl-sm shadow-sm">
-                        <p class="text-sm whitespace-pre-wrap break-words">${escapeHTML(text)}</p>
-                    </div>
-                    <span class="text-[10px] text-gray-400 mt-1 ml-1">${formatTime(timestamp)}</span>
-                `;
-            }
-
-            messagesList.appendChild(messageWrapper);
-            chatArea.scrollTop = chatArea.scrollHeight;
-        }
-
-        // Helper to safely escape HTML tags
+        // Escape helper
         function escapeHTML(str) {
             return str.replace(/[&<>'"]/g, 
                 tag => ({
@@ -280,99 +757,127 @@
             );
         }
 
-        // Read messages in Real-time from database
-        onValue(messagesRef, (snapshot) => {
-            // Hide loading indicator
-            loadingState.style.display = 'none';
-            messagesList.innerHTML = '';
+        // Send new message trigger
+        chatMessageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = messageBody.value.trim();
+            if (!text) return;
 
-            const data = snapshot.val();
-            if (!data) {
-                emptyState.classList.remove('hidden');
+            // Check if activeRoom is News Channel (and ensure guest or user is restricted if they are not administrator)
+            if (activeRoom === 'news' && !currentUserData.email.includes("admin")) {
+                alert("📢 عذراً! هذه قناة إخبارية رسمية. المشرفين والمدراء فقط يمكنهم النشر.");
+                messageBody.value = '';
                 return;
             }
 
-            emptyState.classList.add('hidden');
+            const roomRef = ref(database, `messages/${activeRoom}`);
+            const newMsgRef = push(roomRef);
             
-            // Convert to array and sort by timestamp
-            const items = [];
-            Object.keys(data).forEach(key => {
-                const item = data[key];
-                items.push({
-                    id: key,
-                    sender: item.sender || 'Anonymous',
-                    text: item.text || '',
-                    timestamp: item.timestamp || Date.now()
-                });
-            });
-
-            // Sort ascending by timestamp
-            items.sort((a, b) => a.timestamp - b.timestamp);
-
-            // Render all sorted messages
-            items.forEach(msg => {
-                renderMessage(msg.sender, msg.text, msg.timestamp, msg.id);
-            });
-
-            // Fast scroll to bottom
-            chatArea.scrollTop = chatArea.scrollHeight;
-        });
-
-        // Send Message logic
-        chatForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const text = messageInput.value.trim();
-            if (!text) return;
-
-            const newMessageRef = push(messagesRef);
-            set(newMessageRef, {
-                sender: currentUsername,
+            set(newMsgRef, {
+                sender: currentUserData.displayName || "زائر",
                 text: text,
-                timestamp: serverTimestamp()
+                timestamp: serverTimestamp(),
+                uid: currentUserData.uid
             }).then(() => {
-                messageInput.value = ''; // Clean input field
-                messageInput.focus();
-            }).catch((err) => {
-                alert("خطأ أثناء إرسال الرسالة: " + err.message);
+                messageBody.value = ''; // Clean input
+                messageBody.focus();
+            }).catch(err => {
+                alert("خطأ إرسال: " + err.message);
             });
         });
 
-        // Modal triggers
-        profileChip.addEventListener('click', () => {
-            modalUsernameInput.value = currentUsername;
-            profileModal.classList.remove('hidden');
-            modalUsernameInput.focus();
+        // -------------------------
+        // 4. Reactions system (Telegram like)
+        // -------------------------
+        const reactionMenu = document.getElementById('reactionMenu');
+        let reactionTargetMessageId = null;
+
+        function showReactionPopover(clientX, clientY, messageId) {
+            reactionTargetMessageId = messageId;
+            reactionMenu.classList.remove('hidden');
+
+            // Calculate elegant responsive bounds location
+            const popupWidth = 180;
+            const popupHeight = 40;
+            
+            let posX = clientX - (popupWidth / 2);
+            let posY = clientY - popupHeight - 15;
+
+            // Limit boundary collisions
+            if (posX < 10) posX = 10;
+            if (posY < 10) posY = clientY + 15; // show below
+
+            reactionMenu.style.left = `${posX}px`;
+            reactionMenu.style.top = `${posY}px`;
+        }
+
+        // Click emojis reaction bar items trigger
+        document.querySelectorAll('.react-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const emoji = btn.dataset.emoji;
+                if (reactionTargetMessageId) {
+                    toggleReaction(reactionTargetMessageId, emoji);
+                }
+                reactionMenu.classList.add('hidden');
+            });
         });
 
-        userAvatar.addEventListener('click', () => {
-            profileChip.click();
+        // Toggle reactions inside the Realtime Database
+        function toggleReaction(msgId, emoji) {
+            const userId = currentUserData.uid;
+            const reactRef = ref(database, `messages/${activeRoom}/${msgId}/reactions/${userId}`);
+            
+            // Single connection check toggle
+            const existingReactRef = ref(database, `messages/${activeRoom}/${msgId}/reactions/${userId}`);
+            onValue(existingReactRef, (snapshot) => {
+                const currentVal = snapshot.val();
+                if (currentVal === emoji) {
+                    // Clicked same emoji: remove reaction!
+                    remove(reactRef);
+                } else {
+                    // Clicked different emoji or new reaction: Set it!
+                    set(reactRef, emoji);
+                }
+            }, { onlyOnce: true });
+        }
+
+        // Close Popovers on clicking anywhere
+        document.addEventListener('click', () => {
+            reactionMenu.classList.add('hidden');
         });
 
-        closeModalBtn.addEventListener('click', () => {
-            profileModal.classList.add('hidden');
-        });
-
-        saveModalBtn.addEventListener('click', () => {
-            const inputVal = modalUsernameInput.value.trim();
-            if (inputVal) {
-                currentUsername = inputVal;
-                localStorage.setItem('yhchat_username', currentUsername);
-                updateNicknameUI();
-                profileModal.classList.add('hidden');
-                
-                // Refresh list display to reflect self colors with new nickname
-                location.reload();
-            } else {
-                alert("الاسم لا يمكن أن يكون فارغاً!");
+        // -------------------------
+        // 5. Advanced Search Filter
+        // -------------------------
+        messageSearch.addEventListener('input', () => {
+            const term = messageSearch.value.trim().toLowerCase();
+            if (!term) {
+                renderAllMessages(currentMessages);
+                return;
             }
+
+            const filtered = currentMessages.filter(msg => 
+                msg.text.toLowerCase().includes(term) || 
+                msg.sender.toLowerCase().includes(term)
+            );
+            renderAllMessages(filtered);
         });
 
-        // Close modal when clicking outside
-        profileModal.addEventListener('click', (e) => {
-            if (e.target === profileModal) {
-                profileModal.classList.add('hidden');
-            }
+        // -------------------------
+        // 6. Mobile Sidebar toggles
+        // -------------------------
+        const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+        sidebarToggleBtn.addEventListener('click', () => {
+            sidebar.classList.remove('translate-x-full');
+            sidebarOverlay.classList.remove('hidden');
         });
+
+        sidebarOverlay.addEventListener('click', () => {
+            sidebar.classList.add('translate-x-full');
+            sidebarOverlay.classList.add('hidden');
+        });
+
     </script>
 </body>
 </html>
