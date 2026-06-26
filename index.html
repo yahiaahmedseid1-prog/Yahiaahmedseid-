@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YHChat - Sleek Instant Messaging</title>
+    <!-- Tailwind CSS v4 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Material Symbols Outlined -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <style>
+        /* Custom scrollbar styling for seamless look */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #EFF1F8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #D3E4FF;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.7; }
+        }
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="h-full m-0 flex flex-col bg-[#F7F9FC] text-[#1A1C1E] font-sans overflow-hidden">
+
+    <!-- App Wrapper -->
+    <div class="flex flex-col h-full w-full max-w-lg mx-auto bg-white md:shadow-xl md:my-0 h-full relative">
+        
+        <!-- App Bar (Header) -->
+        <header class="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shrink-0 z-10">
+            <div class="flex items-center gap-3">
+                <!-- User Avatar Badge with Initial -->
+                <div id="userAvatar" class="w-10 h-10 rounded-full bg-[#005AC1] flex items-center justify-center text-white font-bold text-lg shadow-sm transition-transform active:scale-95 cursor-pointer">
+                    Y
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight tracking-wide text-[#005AC1]">YHChat</h1>
+                    <p class="text-xs text-[#44474E] flex items-center gap-1.5">
+                        <span id="connectionDot" class="w-2 h-2 bg-green-500 rounded-full pulse-dot"></span>
+                        <span id="connectionStatus">متصل الآن</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Nickname / Profile Edit Chip -->
+            <button id="profileChip" class="flex items-center gap-1.5 px-3 py-1.5 bg-[#EFF1F8] hover:bg-[#D3E4FF] text-[#44474E] text-xs font-semibold rounded-full transition-all active:scale-95">
+                <span class="material-symbols-outlined text-sm">person</span>
+                <span id="displayUsername">جاري التحميل...</span>
+            </button>
+        </header>
+
+        <!-- Chat Area (Messages Display) -->
+        <main id="chatArea" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F7F9FC] flex flex-col">
+            <!-- Loading Indicator -->
+            <div id="loadingState" class="flex flex-col items-center justify-center h-full space-y-3">
+                <div class="w-8 h-8 border-4 border-[#005AC1] border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-xs text-gray-500">جاري الاتصال بقاعدة البيانات الفورية...</p>
+            </div>
+
+            <!-- Empty State (Hidden initially) -->
+            <div id="emptyState" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center my-auto">
+                <div class="w-16 h-16 rounded-full bg-[#EFF1F8] flex items-center justify-center mb-4 text-[#005AC1]">
+                    <span class="material-symbols-outlined text-3xl">forum</span>
+                </div>
+                <h3 class="text-base font-bold text-gray-800">لا توجد رسائل بعد</h3>
+                <p class="text-xs text-gray-500 mt-1 max-w-[240px]">كن أول من يرسل رسالة فورية في هذه المحادثة!</p>
+            </div>
+
+            <!-- Messages List Container -->
+            <div id="messagesList" class="space-y-4 flex flex-col w-full"></div>
+        </main>
+
+        <!-- Bottom Input Bar (Footer) -->
+        <footer class="px-3 py-3.5 bg-white border-t border-gray-100 shrink-0 z-10">
+            <form id="chatForm" class="flex items-center gap-2">
+                <!-- Input pill -->
+                <div class="flex-1 bg-[#EFF1F8] rounded-full px-4 py-2 flex items-center gap-2 border border-transparent focus-within:border-[#005AC1] focus-within:bg-white transition-all">
+                    <!-- Emoji placeholder icon -->
+                    <button type="button" class="text-[#44474E] hover:text-[#005AC1] transition-colors focus:outline-none flex items-center">
+                        <span class="material-symbols-outlined text-xl">mood</span>
+                    </button>
+                    
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="أكتب رسالتك هنا..." 
+                        class="bg-transparent w-full text-sm focus:outline-none text-[#1A1C1E] py-1"
+                        autocomplete="off"
+                        required
+                    />
+                    
+                    <!-- Attachment button placeholder -->
+                    <button type="button" class="text-[#44474E] hover:text-[#005AC1] transition-colors focus:outline-none flex items-center">
+                        <span class="material-symbols-outlined text-xl rotate-45">attach_file</span>
+                    </button>
+                </div>
+                
+                <!-- Send Button -->
+                <button 
+                    type="submit" 
+                    id="sendBtn"
+                    class="w-11 h-11 bg-[#005AC1] hover:bg-[#004F56] text-white rounded-full flex items-center justify-center shadow-md active:scale-95 hover:shadow-lg transition-all focus:outline-none"
+                >
+                    <span class="material-symbols-outlined text-xl rotate-180">send</span>
+                </button>
+            </form>
+        </footer>
+
+        <!-- Edit Profile Modal / Dialog -->
+        <div id="profileModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl scale-95 transition-transform duration-300">
+                <div class="flex flex-col items-center text-center">
+                    <div class="w-12 h-12 rounded-full bg-[#D3E4FF] flex items-center justify-center text-[#005AC1] mb-3">
+                        <span class="material-symbols-outlined text-2xl">person</span>
+                    </div>
+                    <h3 class="text-md font-bold text-[#1A1C1E]">تعديل اسم المستخدم</h3>
+                    <p class="text-xs text-gray-500 mt-1 mb-4">اختر اسماً مستعاراً ليظهر للآخرين عند إرسال الرسائل.</p>
+                    
+                    <input 
+                        type="text" 
+                        id="modalUsernameInput" 
+                        class="w-full px-4 py-2.5 bg-[#EFF1F8] border border-transparent rounded-xl text-sm focus:outline-none focus:border-[#005AC1] focus:bg-white text-center font-semibold transition-all mb-4"
+                        placeholder="أدخل اسمك المستعار..."
+                        maxlength="15"
+                    />
+                    
+                    <div class="flex gap-2 w-full">
+                        <button type="button" id="closeModalBtn" class="flex-1 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">إلغاء</button>
+                        <button type="button" id="saveModalBtn" class="flex-1 py-2 text-sm font-bold bg-[#005AC1] hover:bg-[#004F56] text-white rounded-xl shadow-md transition-colors">حفظ</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDK Imports & Custom Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics.js";
+        import { getDatabase, ref, push, set, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD3q22qKvq-B-KCnDmC0VjAOtVUf1lEWDE",
+            authDomain: "yhchat-28b00.firebaseapp.com",
+            databaseURL: "https://yhchat-28b00-default-rtdb.firebaseio.com",
+            projectId: "yhchat-28b00",
+            storageBucket: "yhchat-28b00.firebasestorage.app",
+            messagingSenderId: "103585895934",
+            appId: "1:103585895934:web:6b7b40a8b29ef0496e1caf",
+            measurementId: "G-8G2703Z7KP"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const database = getDatabase(app);
+        const messagesRef = ref(database, 'messages');
+
+        // Nickname initialization
+        let currentUsername = localStorage.getItem('yhchat_username');
+        if (!currentUsername) {
+            currentUsername = "مستخدم_" + Math.floor(1000 + Math.random() * 9000);
+            localStorage.setItem('yhchat_username', currentUsername);
+        }
+
+        // DOM elements
+        const chatArea = document.getElementById('chatArea');
+        const messagesList = document.getElementById('messagesList');
+        const chatForm = document.getElementById('chatForm');
+        const messageInput = document.getElementById('messageInput');
+        const displayUsername = document.getElementById('displayUsername');
+        const userAvatar = document.getElementById('userAvatar');
+        const loadingState = document.getElementById('loadingState');
+        const emptyState = document.getElementById('emptyState');
+        const connectionDot = document.getElementById('connectionDot');
+        const connectionStatus = document.getElementById('connectionStatus');
+        
+        // Modal elements
+        const profileChip = document.getElementById('profileChip');
+        const profileModal = document.getElementById('profileModal');
+        const modalUsernameInput = document.getElementById('modalUsernameInput');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const saveModalBtn = document.getElementById('saveModalBtn');
+
+        // Update nickname in UI
+        function updateNicknameUI() {
+            displayUsername.textContent = currentUsername;
+            userAvatar.textContent = currentUsername.charAt(0).toUpperCase();
+        }
+        updateNicknameUI();
+
+        // Connection monitoring
+        const connectedRef = ref(database, '.info/connected');
+        onValue(connectedRef, (snap) => {
+            if (snap.val() === true) {
+                connectionDot.className = "w-2 h-2 bg-green-500 rounded-full pulse-dot";
+                connectionStatus.textContent = "متصل الآن";
+            } else {
+                connectionDot.className = "w-2 h-2 bg-red-500 rounded-full";
+                connectionStatus.textContent = "جاري إعادة الاتصال...";
+            }
+        });
+
+        // Format times nicely (e.g. 10:15 AM)
+        function formatTime(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            let hours = date.getHours();
+            let minutes = date.getMinutes();
+            const ampm = hours >= 12 ? 'م' : 'ص';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            return hours + ':' + minutes + ' ' + ampm;
+        }
+
+        // Render message items
+        function renderMessage(sender, text, timestamp, messageId) {
+            const isSelf = sender === currentUsername;
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = `flex flex-col max-w-[85%] ${isSelf ? 'self-start' : 'self-end'}`;
+            messageWrapper.dataset.id = messageId;
+
+            // HTML structure based on sender
+            if (isSelf) {
+                // Sent by current user (styled light blue on the right)
+                // Wait! Arabic text direction makes right side "self-start" (as parent is RTL/dir="rtl"!). 
+                // In RTL, self-start is indeed the RIGHT side. self-end is the LEFT side.
+                // Let's verify: dir="rtl" makes flex items align to the right by default.
+                // So self-start is Right, self-end is Left. Perfect!
+                messageWrapper.innerHTML = `
+                    <div class="bg-[#D3E4FF] text-[#001D36] p-3 rounded-2xl rounded-tr-sm shadow-sm">
+                        <p class="text-sm whitespace-pre-wrap break-words">${escapeHTML(text)}</p>
+                    </div>
+                    <div class="flex items-center justify-start gap-1 mt-1 mr-1">
+                        <span class="text-[10px] text-gray-400">${formatTime(timestamp)}</span>
+                        <svg class="w-3.5 h-3.5 text-[#005AC1]" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path>
+                        </svg>
+                    </div>
+                `;
+            } else {
+                // Sent by other users (styled white bubble with border on the left)
+                messageWrapper.innerHTML = `
+                    <span class="text-[10px] font-bold text-[#005AC1] mb-1 mr-1">${escapeHTML(sender)}</span>
+                    <div class="bg-white border border-[#EFF1F8] text-[#1A1C1E] p-3 rounded-2xl rounded-tl-sm shadow-sm">
+                        <p class="text-sm whitespace-pre-wrap break-words">${escapeHTML(text)}</p>
+                    </div>
+                    <span class="text-[10px] text-gray-400 mt-1 ml-1">${formatTime(timestamp)}</span>
+                `;
+            }
+
+            messagesList.appendChild(messageWrapper);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        // Helper to safely escape HTML tags
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+
+        // Read messages in Real-time from database
+        onValue(messagesRef, (snapshot) => {
+            // Hide loading indicator
+            loadingState.style.display = 'none';
+            messagesList.innerHTML = '';
+
+            const data = snapshot.val();
+            if (!data) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            
+            // Convert to array and sort by timestamp
+            const items = [];
+            Object.keys(data).forEach(key => {
+                const item = data[key];
+                items.push({
+                    id: key,
+                    sender: item.sender || 'Anonymous',
+                    text: item.text || '',
+                    timestamp: item.timestamp || Date.now()
+                });
+            });
+
+            // Sort ascending by timestamp
+            items.sort((a, b) => a.timestamp - b.timestamp);
+
+            // Render all sorted messages
+            items.forEach(msg => {
+                renderMessage(msg.sender, msg.text, msg.timestamp, msg.id);
+            });
+
+            // Fast scroll to bottom
+            chatArea.scrollTop = chatArea.scrollHeight;
+        });
+
+        // Send Message logic
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = messageInput.value.trim();
+            if (!text) return;
+
+            const newMessageRef = push(messagesRef);
+            set(newMessageRef, {
+                sender: currentUsername,
+                text: text,
+                timestamp: serverTimestamp()
+            }).then(() => {
+                messageInput.value = ''; // Clean input field
+                messageInput.focus();
+            }).catch((err) => {
+                alert("خطأ أثناء إرسال الرسالة: " + err.message);
+            });
+        });
+
+        // Modal triggers
+        profileChip.addEventListener('click', () => {
+            modalUsernameInput.value = currentUsername;
+            profileModal.classList.remove('hidden');
+            modalUsernameInput.focus();
+        });
+
+        userAvatar.addEventListener('click', () => {
+            profileChip.click();
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            profileModal.classList.add('hidden');
+        });
+
+        saveModalBtn.addEventListener('click', () => {
+            const inputVal = modalUsernameInput.value.trim();
+            if (inputVal) {
+                currentUsername = inputVal;
+                localStorage.setItem('yhchat_username', currentUsername);
+                updateNicknameUI();
+                profileModal.classList.add('hidden');
+                
+                // Refresh list display to reflect self colors with new nickname
+                location.reload();
+            } else {
+                alert("الاسم لا يمكن أن يكون فارغاً!");
+            }
+        });
+
+        // Close modal when clicking outside
+        profileModal.addEventListener('click', (e) => {
+            if (e.target === profileModal) {
+                profileModal.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
