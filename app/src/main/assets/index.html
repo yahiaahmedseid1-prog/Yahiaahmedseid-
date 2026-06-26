@@ -151,8 +151,20 @@
                 </div>
             </div>
 
-            <!-- List of Channels / Groups (Telegram Concept) -->
-            <div class="flex-1 overflow-y-auto p-2 space-y-1">
+            <!-- Sidebar Tabs (Rooms vs Direct Messages) -->
+            <div class="flex bg-gray-100 dark:bg-[#24303F] p-1 mx-3 mb-2 rounded-xl border border-gray-100 dark:border-gray-800/50">
+                <button id="sidebarTabRooms" class="flex-1 py-1.5 text-[11px] font-bold rounded-lg bg-white dark:bg-[#17212B] text-[#005AC1] dark:text-[#64B5F6] shadow-xs transition-all flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-sm">groups</span>
+                    <span>الغرف والقنوات</span>
+                </button>
+                <button id="sidebarTabDMs" class="flex-1 py-1.5 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-all flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-sm">chat</span>
+                    <span>مراسلة خاصة</span>
+                </button>
+            </div>
+
+            <!-- Tab 1: Rooms Container -->
+            <div id="roomsTabContainer" class="flex-1 overflow-y-auto p-2 space-y-1">
                 <p class="text-[10px] font-bold text-gray-400 px-3 uppercase tracking-wider mb-2">قنوات وغرف تلجرام</p>
                 
                 <!-- Room item 1: Public Chat Room -->
@@ -195,6 +207,25 @@
                         </div>
                     </div>
                 </button>
+            </div>
+
+            <!-- Tab 2: DMs/Users Container -->
+            <div id="dmsTabContainer" class="hidden flex-1 flex flex-col p-2 min-h-0 overflow-hidden">
+                <!-- User Search Input -->
+                <div class="px-2 mb-3">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">البحث عن مستخدمين</p>
+                    <div class="flex items-center gap-1.5 bg-[#EFF1F8] dark:bg-[#24303F] px-3 py-2 rounded-xl text-xs">
+                        <span class="material-symbols-outlined text-gray-400 text-sm">person_search</span>
+                        <input type="text" id="userSearchInput" class="bg-transparent w-full focus:outline-none" placeholder="ابحث بالاسم أو البريد...">
+                    </div>
+                </div>
+
+                <!-- Scrollable list of registered users -->
+                <div class="flex-1 overflow-y-auto space-y-1.5 px-1" id="usersListContainer">
+                    <div class="text-center py-4 text-xs text-gray-400">
+                        جاري تحميل قائمة المستخدمين...
+                    </div>
+                </div>
             </div>
 
             <!-- Footer indicator -->
@@ -348,6 +379,14 @@
         const activeRoomName = document.getElementById('activeRoomName');
         const activeRoomDesc = document.getElementById('activeRoomDesc');
         const roomBadge = document.getElementById('roomBadge');
+
+        // Sidebar Tabs DOM Caches
+        const sidebarTabRooms = document.getElementById('sidebarTabRooms');
+        const sidebarTabDMs = document.getElementById('sidebarTabDMs');
+        const roomsTabContainer = document.getElementById('roomsTabContainer');
+        const dmsTabContainer = document.getElementById('dmsTabContainer');
+        const userSearchInput = document.getElementById('userSearchInput');
+        const usersListContainer = document.getElementById('usersListContainer');
 
         // Auth form elements
         const authForm = document.getElementById('authForm');
@@ -517,8 +556,162 @@
             sidebarUsername.textContent = user.displayName || "مجهول";
             sidebarUserAvatar.textContent = (user.displayName || "G").charAt(0).toUpperCase();
 
+            // Save user to database users node
+            if (user && user.uid) {
+                const userRef = ref(database, `users/${user.uid}`);
+                set(userRef, {
+                    uid: user.uid,
+                    displayName: user.displayName || "مستعار",
+                    email: user.email || "guest@yhchat.com",
+                    lastActive: serverTimestamp()
+                }).catch(err => console.log("Error writing user node:", err));
+            }
+
             // Set default room messages monitor active
             switchRoom(activeRoom);
+
+            // Initialize tabs & direct messaging listeners
+            initTabsAndDMs();
+        }
+
+        let allUsers = [];
+
+        function initTabsAndDMs() {
+            // Tab switching click listeners
+            sidebarTabRooms.addEventListener('click', () => {
+                sidebarTabRooms.className = "flex-1 py-1.5 text-[11px] font-bold rounded-lg bg-white dark:bg-[#17212B] text-[#005AC1] dark:text-[#64B5F6] shadow-xs transition-all flex items-center justify-center gap-1";
+                sidebarTabDMs.className = "flex-1 py-1.5 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-all flex items-center justify-center gap-1";
+                roomsTabContainer.classList.remove('hidden');
+                dmsTabContainer.classList.add('hidden');
+            });
+
+            sidebarTabDMs.addEventListener('click', () => {
+                sidebarTabDMs.className = "flex-1 py-1.5 text-[11px] font-bold rounded-lg bg-white dark:bg-[#17212B] text-[#005AC1] dark:text-[#64B5F6] shadow-xs transition-all flex items-center justify-center gap-1";
+                sidebarTabRooms.className = "flex-1 py-1.5 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-all flex items-center justify-center gap-1";
+                roomsTabContainer.classList.add('hidden');
+                dmsTabContainer.classList.remove('hidden');
+                
+                // Fetch users
+                loadUsersList();
+            });
+
+            // Live user search filtering
+            userSearchInput.addEventListener('input', () => {
+                const term = userSearchInput.value.trim().toLowerCase();
+                if (!term) {
+                    renderUsersList(allUsers);
+                    return;
+                }
+                const filtered = allUsers.filter(u => 
+                    (u.displayName && u.displayName.toLowerCase().includes(term)) ||
+                    (u.email && u.email.toLowerCase().includes(term))
+                );
+                renderUsersList(filtered);
+            });
+        }
+
+        // Fetch user records from database
+        function loadUsersList() {
+            const usersRef = ref(database, 'users');
+            onValue(usersRef, (snapshot) => {
+                const data = snapshot.val();
+                allUsers = [];
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        const u = data[key];
+                        // Exclude current user from DM directory
+                        if (u.uid !== currentUserData.uid) {
+                            allUsers.push(u);
+                        }
+                    });
+                }
+                
+                // Sort users by name
+                allUsers.sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
+                
+                // Render the list
+                const query = userSearchInput.value.trim().toLowerCase();
+                if (query) {
+                    const filtered = allUsers.filter(u => 
+                        (u.displayName && u.displayName.toLowerCase().includes(query)) ||
+                        (u.email && u.email.toLowerCase().includes(query))
+                    );
+                    renderUsersList(filtered);
+                } else {
+                    renderUsersList(allUsers);
+                }
+            });
+        }
+
+        // Get unique private chat room ID from two user uids
+        function getDmRoomId(uid1, uid2) {
+            return uid1 < uid2 ? `dm_${uid1}_${uid2}` : `dm_${uid2}_${uid1}`;
+        }
+
+        // Render user buttons in the DM panel
+        function renderUsersList(users) {
+            usersListContainer.innerHTML = '';
+            if (users.length === 0) {
+                usersListContainer.innerHTML = `
+                    <div class="text-center py-6 text-xs text-gray-400">
+                        <span class="material-symbols-outlined text-2xl block mb-1">search_off</span>
+                        لا يوجد مستخدمين بهذا الاسم أو البريد
+                    </div>
+                `;
+                return;
+            }
+
+            users.forEach(u => {
+                const dmRoomId = getDmRoomId(currentUserData.uid, u.uid);
+                const isDmActive = activeRoom === dmRoomId;
+                const firstLetter = (u.displayName || "G").charAt(0).toUpperCase();
+                
+                const btn = document.createElement('button');
+                btn.className = `w-full flex items-center justify-between p-2.5 rounded-2xl text-right transition-all ${isDmActive ? 'bg-[#E8F0FE] dark:bg-[#2B394A] active' : 'hover:bg-gray-50 dark:hover:bg-[#202B36]'}`;
+                
+                btn.innerHTML = `
+                    <div class="flex items-center gap-2.5 overflow-hidden w-full">
+                        <div class="w-9 h-9 shrink-0 rounded-full bg-gradient-to-br from-[#005AC1] to-[#0088cc] text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                            ${firstLetter}
+                        </div>
+                        <div class="overflow-hidden w-full">
+                            <span class="block text-xs font-bold text-gray-900 dark:text-white truncate">${escapeHTML(u.displayName)}</span>
+                            <span class="block text-[10px] text-gray-500 dark:text-gray-400 truncate">${escapeHTML(u.email || "بدون بريد")}</span>
+                        </div>
+                    </div>
+                    <span class="w-2 h-2 rounded-full ${isDmActive ? 'bg-[#005AC1] dark:bg-[#64B5F6]' : 'bg-transparent'}"></span>
+                `;
+
+                btn.addEventListener('click', () => {
+                    startPrivateChat(u);
+                });
+
+                usersListContainer.appendChild(btn);
+            });
+        }
+
+        // Start private messaging room
+        function startPrivateChat(recipient) {
+            const dmRoomId = getDmRoomId(currentUserData.uid, recipient.uid);
+            
+            // Inject dynamic configuration for DM room so switchRoom is happy
+            roomsConfig[dmRoomId] = {
+                name: recipient.displayName || "محادثة خاصة",
+                desc: "محادثة خاصة آمنة مع " + (recipient.displayName || "المستخدم"),
+                icon: "shield_person",
+                badge: "محادثة خاصة",
+                bgColor: "bg-[#0070F3]"
+            };
+
+            // Switch to this room
+            switchRoom(dmRoomId);
+
+            // Re-render so selected DM highlights
+            renderUsersList(allUsers);
+
+            // Close mobile sidebar if open
+            sidebar.classList.add('translate-x-full');
+            sidebarOverlay.classList.add('hidden');
         }
 
         // -------------------------
