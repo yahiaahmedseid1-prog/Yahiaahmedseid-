@@ -179,6 +179,16 @@
         </div>
     </div>
 
+    <!-- Screen 4: Image Preview Modal -->
+    <div id="imagePreviewModal" class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <!-- Close Button -->
+        <button id="closeImagePreviewBtn" type="button" class="absolute top-4 right-4 text-white hover:bg-white/10 p-2 rounded-full transition-all cursor-pointer">
+            <span class="material-symbols-outlined text-3xl">close</span>
+        </button>
+        <!-- Large Image -->
+        <img id="imagePreviewLarge" src="" class="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl transition-all duration-300 scale-95" alt="تكبير الصورة">
+    </div>
+
     <!-- Main Screen Layout (Active after login) -->
     <div id="appContainer" class="hidden flex h-full w-full relative">
         
@@ -374,12 +384,16 @@
                             class="bg-transparent w-full text-sm focus:outline-none text-[#1A1C1E] dark:text-white py-1.5"
                             autocomplete="off"
                             maxlength="500"
-                            required
                         />
 
-                        <button type="button" class="text-gray-500 dark:text-gray-400 hover:text-[#005AC1] transition-colors focus:outline-none flex items-center">
-                            <span class="material-symbols-outlined text-xl rotate-45">attach_file</span>
+                        <button type="button" id="attachImageBtn" class="text-gray-500 dark:text-gray-400 hover:text-[#005AC1] transition-colors focus:outline-none flex items-center justify-center w-8 h-8">
+                            <span id="attachIcon" class="material-symbols-outlined text-xl rotate-45">attach_file</span>
+                            <svg id="uploadSpinner" class="animate-spin h-5 w-5 text-[#005AC1] hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
                         </button>
+                        <input type="file" id="imageInput" accept="image/*" class="hidden" />
                     </div>
 
                     <!-- Submit / Send Button -->
@@ -400,6 +414,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
         import { getDatabase, ref, push, set, onValue, remove, update, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
+        import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
 
         // Firebase Web Config
         const firebaseConfig = {
@@ -417,6 +432,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const database = getDatabase(app);
+        const storage = getStorage(app);
 
         // State variables
         let isRegisterMode = false;
@@ -989,17 +1005,30 @@
 
                 chatEmptyState.classList.add('hidden');
                 const items = [];
+                const updatesToMake = {};
                 Object.keys(data).forEach(key => {
                     const value = data[key];
+                    const isRead = value.read === true;
                     items.push({
                         id: key,
                         sender: value.sender || "زائر مجهول",
                         text: value.text || "",
                         timestamp: value.timestamp || Date.now(),
                         uid: value.uid || "",
-                        reactions: value.reactions || {}
+                        reactions: value.reactions || {},
+                        read: isRead
                     });
+
+                    // If the message is from another user and is not marked as read yet, update it
+                    if (value.uid !== currentUserData.uid && !isRead) {
+                        updatesToMake[`${key}/read`] = true;
+                    }
                 });
+
+                // Update unread messages as read in the database
+                if (Object.keys(updatesToMake).length > 0) {
+                    update(roomRef, updatesToMake).catch(err => console.log("Error marking messages as read:", err));
+                }
 
                 // Sort items oldest to newest
                 items.sort((a, b) => a.timestamp - b.timestamp);
@@ -1056,32 +1085,56 @@
                 `;
             }
 
+            // Text and Image templates
+            const textHTML = msg.text ? `<p class="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(msg.text)}</p>` : '';
+            const imageHTML = msg.imageUrl ? `
+                <div class="mt-1 mb-1 rounded-xl overflow-hidden max-w-full border border-gray-100 dark:border-gray-800 cursor-zoom-in hover:opacity-95 transition-all">
+                    <img src="${msg.imageUrl}" class="max-h-60 object-cover w-full cursor-pointer image-preview-trigger" data-src="${msg.imageUrl}" alt="صورة مرسلة" />
+                </div>
+            ` : '';
+
             // HTML content depends on self status
             if (isSelf) {
                 // Current sender bubbles (Sleek Blue, shown right side)
+                const checkmarkColor = msg.read ? 'text-[#00B0FF] dark:text-[#40C4FF] font-bold' : 'text-gray-400 dark:text-gray-500';
                 itemDiv.innerHTML = `
                     <div class="relative bg-[#D3E4FF] dark:bg-[#2B5278] text-[#001D36] dark:text-[#F4F4F7] p-3 rounded-2xl rounded-tr-sm shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-99 message-bubble">
-                        <p class="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(msg.text)}</p>
+                        ${imageHTML}
+                        ${textHTML}
                     </div>
                     <div class="flex items-center justify-between gap-2 mt-1 mr-1">
-                        <div class="flex items-center gap-1">
+                        <div class="flex items-center gap-2">
                             <span class="text-[10px] text-gray-400 dark:text-gray-500">${timeStr}</span>
-                            <span class="material-symbols-outlined text-[14px] text-[#005AC1] dark:text-[#64B5F6] leading-none">done_all</span>
+                            <span class="material-symbols-outlined text-[14px] ${checkmarkColor} leading-none">done_all</span>
+                            <button class="delete-message-btn text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors focus:outline-none flex items-center leading-none" data-id="${msg.id}" title="حذف الرسالة">
+                                <span class="material-symbols-outlined text-[14px] leading-none">delete</span>
+                            </button>
                         </div>
                     </div>
                     <div class="reactions-container">${reactionsHTML}</div>
                 `;
             } else {
                 // External sender bubbles (Sleek White with light-gray borders, left side)
+                const isAdmin = currentUserData && currentUserData.email && currentUserData.email.includes("admin");
+                const deleteBtnHTML = isAdmin ? `
+                    <button class="delete-message-btn text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors focus:outline-none flex items-center leading-none" data-id="${msg.id}" title="حذف الرسالة (إشراف)">
+                        <span class="material-symbols-outlined text-[14px] leading-none">delete</span>
+                    </button>
+                ` : '';
+
                 itemDiv.innerHTML = `
                     <span class="text-[10px] font-extrabold text-[#005AC1] dark:text-[#64B5F6] mb-1 mr-1.5 flex items-center gap-1">
                         <span class="material-symbols-outlined text-xs">verified</span>
                         ${escapeHTML(msg.sender)}
                     </span>
                     <div class="bg-white dark:bg-[#182533] border border-gray-100 dark:border-gray-800 text-[#1A1C1E] dark:text-white p-3 rounded-2xl rounded-tl-sm shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-99 message-bubble">
-                        <p class="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(msg.text)}</p>
+                        ${imageHTML}
+                        ${textHTML}
                     </div>
-                    <span class="text-[10px] text-gray-400 dark:text-gray-500 mt-1 ml-1.5">${timeStr}</span>
+                    <div class="flex items-center gap-2 mt-1 ml-1.5">
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500">${timeStr}</span>
+                        ${deleteBtnHTML}
+                    </div>
                     <div class="reactions-container">${reactionsHTML}</div>
                 `;
             }
@@ -1101,6 +1154,23 @@
                     toggleReaction(msg.id, emoji);
                 });
             });
+
+            // Attach image clicks listener
+            itemDiv.querySelectorAll('.image-preview-trigger').forEach(img => {
+                img.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openImagePreview(img.dataset.src);
+                });
+            });
+
+            // Attach delete action
+            const deleteBtn = itemDiv.querySelector('.delete-message-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteMessage(msg.id);
+                });
+            }
 
             messagesContainer.appendChild(itemDiv);
         }
@@ -1153,7 +1223,8 @@
                 sender: currentUserData.displayName || "زائر",
                 text: text,
                 timestamp: serverTimestamp(),
-                uid: currentUserData.uid
+                uid: currentUserData.uid,
+                read: false
             }).then(() => {
                 messageBody.value = ''; // Clean input
                 messageBody.focus();
@@ -1253,6 +1324,103 @@
             sidebar.classList.add('translate-x-full');
             sidebarOverlay.classList.add('hidden');
         });
+
+        // -------------------------
+        // 7. Image Upload & Message Deletion & Preview Modal
+        // -------------------------
+        const attachImageBtn = document.getElementById('attachImageBtn');
+        const imageInput = document.getElementById('imageInput');
+        const attachIcon = document.getElementById('attachIcon');
+        const uploadSpinner = document.getElementById('uploadSpinner');
+
+        const imagePreviewModal = document.getElementById('imagePreviewModal');
+        const imagePreviewLarge = document.getElementById('imagePreviewLarge');
+        const closeImagePreviewBtn = document.getElementById('closeImagePreviewBtn');
+
+        // Image Preview Lightbox Opening
+        window.openImagePreview = function(url) {
+            imagePreviewLarge.src = url;
+            imagePreviewModal.classList.remove('hidden');
+            setTimeout(() => {
+                imagePreviewLarge.classList.remove('scale-95');
+                imagePreviewLarge.classList.add('scale-100');
+            }, 50);
+        };
+
+        // Lightbox Closing
+        closeImagePreviewBtn.addEventListener('click', () => {
+            imagePreviewLarge.classList.remove('scale-100');
+            imagePreviewLarge.classList.add('scale-95');
+            setTimeout(() => {
+                imagePreviewModal.classList.add('hidden');
+                imagePreviewLarge.src = '';
+            }, 150);
+        });
+
+        // Trigger file picker click
+        attachImageBtn.addEventListener('click', () => {
+            // Check restriction on News Channel
+            if (activeRoom === 'news' && !currentUserData.email.includes("admin")) {
+                alert("📢 عذراً! هذه قناة إخبارية رسمية. المشرفين والمدراء فقط يمكنهم النشر.");
+                return;
+            }
+            imageInput.click();
+        });
+
+        // Handle File selection and Upload to Firebase Storage
+        imageInput.addEventListener('change', () => {
+            const file = imageInput.files[0];
+            if (!file) return;
+
+            // Restrict size to 5MB
+            if (file.size > 5 * 1024 * 1024) {
+                alert("حجم الصورة كبير جداً! الحد الأقصى هو 5 ميجابايت.");
+                imageInput.value = '';
+                return;
+            }
+
+            // Show Spinner State
+            attachIcon.classList.add('hidden');
+            uploadSpinner.classList.remove('hidden');
+
+            const filename = `${Date.now()}_${file.name}`;
+            const imageRef = sRef(storage, `chat_images/${activeRoom}/${filename}`);
+
+            uploadBytes(imageRef, file).then((snapshot) => {
+                return getDownloadURL(snapshot.ref);
+            }).then((downloadURL) => {
+                // Send message with image URL
+                const roomRef = ref(database, `messages/${activeRoom}`);
+                const newMsgRef = push(roomRef);
+                return set(newMsgRef, {
+                    sender: currentUserData.displayName || "زائر",
+                    text: "",
+                    imageUrl: downloadURL,
+                    timestamp: serverTimestamp(),
+                    uid: currentUserData.uid,
+                    read: false
+                });
+            }).then(() => {
+                imageInput.value = ''; // Reset file input
+            }).catch((err) => {
+                console.error("Image Upload Failed:", err);
+                alert("عذراً، حدث خطأ أثناء رفع وإرسال الصورة: " + err.message);
+            }).finally(() => {
+                // Restore button state
+                uploadSpinner.classList.add('hidden');
+                attachIcon.classList.remove('hidden');
+            });
+        });
+
+        // Delete Message Function
+        window.deleteMessage = function(messageId) {
+            if (confirm("هل أنت متأكد من رغبتك في حذف هذه الرسالة نهائياً؟")) {
+                const messageRef = ref(database, `messages/${activeRoom}/${messageId}`);
+                remove(messageRef).catch(err => {
+                    alert("خطأ أثناء حذف الرسالة: " + err.message);
+                });
+            }
+        };
 
     </script>
 </body>
