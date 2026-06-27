@@ -777,10 +777,13 @@
                     renderUsersList(allUsers);
                     return;
                 }
-                const filtered = allUsers.filter(u => 
-                    (u.displayName && u.displayName.toLowerCase().includes(term)) ||
-                    (u.email && u.email.toLowerCase().includes(term))
-                );
+                const filtered = allUsers.filter(u => {
+                    if (!u) return false;
+                    const displayName = String(u.displayName || "").toLowerCase();
+                    const email = String(u.email || "").toLowerCase();
+                    const bio = String(u.bio || "").toLowerCase();
+                    return displayName.includes(term) || email.includes(term) || bio.includes(term);
+                });
                 renderUsersList(filtered);
             });
         }
@@ -795,7 +798,7 @@
                     Object.keys(data).forEach(key => {
                         const u = data[key];
                         // Exclude current user from DM directory
-                        if (u.uid !== currentUserData.uid) {
+                        if (u && u.uid && u.uid !== currentUserData.uid) {
                             allUsers.push(u);
                         }
                     });
@@ -807,10 +810,13 @@
                 // Render the list
                 const query = userSearchInput.value.trim().toLowerCase();
                 if (query) {
-                    const filtered = allUsers.filter(u => 
-                        (u.displayName && u.displayName.toLowerCase().includes(query)) ||
-                        (u.email && u.email.toLowerCase().includes(query))
-                    );
+                    const filtered = allUsers.filter(u => {
+                        if (!u) return false;
+                        const displayName = String(u.displayName || "").toLowerCase();
+                        const email = String(u.email || "").toLowerCase();
+                        const bio = String(u.bio || "").toLowerCase();
+                        return displayName.includes(query) || email.includes(query) || bio.includes(query);
+                    });
                     renderUsersList(filtered);
                 } else {
                     renderUsersList(allUsers);
@@ -1114,7 +1120,9 @@
 
         // Escape helper
         function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, 
+            if (str === null || str === undefined) return "";
+            const stringValue = String(str);
+            return stringValue.replace(/[&<>'"]/g, 
                 tag => ({
                     '&': '&amp;',
                     '<': '&lt;',
